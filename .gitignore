@@ -1,0 +1,22 @@
+# Entorno / editor
+.env
+.env.* 
+venv/
+env/
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.vscode/
+
+# Datos generados / pesados
+data/*.png
+data/*.jpg
+data/*.pdf
+data/*.db
+data/*.parquet
+data/*.zip
+
+
+
+# Notebooks de caché
+*.log
