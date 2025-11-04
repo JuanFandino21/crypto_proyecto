@@ -1,3 +1,4 @@
+Gileny Silva Leal 2220221010 - Laura Natalia Gómez 2220232021 - Juan David Fandiño Hernández 2220221087
 # Proyecto Crypto
 
 Análisis de criptomonedas y modelos de predicción (Sprint 1 y Sprint 2).
