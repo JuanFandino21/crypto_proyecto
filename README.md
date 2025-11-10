@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 **Proyecto: Análisis y recomendación de criptomonedas**
 
 Este proyecto se centra en analizar algunas criptomonedas (BTC, ETH y ADA) y construir, paso a paso, un sistema básico que permita recomendar monedas según el perfil de riesgo de una persona, apoyándose en datos históricos y en modelos que intentan predecir el comportamiento del precio.
