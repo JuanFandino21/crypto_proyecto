@@ -16,7 +16,7 @@ data/*.db
 data/*.parquet
 data/*.zip
 
-
-
+data/figs/
+.vscode/
 # Notebooks de caché
 *.log
