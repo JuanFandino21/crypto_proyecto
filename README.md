@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 **Proyecto: Análisis y recomendación de criptomonedas**
 
 Este proyecto se centra en analizar algunas criptomonedas (BTC, ETH y ADA) y construir, paso a paso, un sistema básico que permita recomendar monedas según el perfil de riesgo de una persona, apoyándose en datos históricos y en modelos que intentan predecir el comportamiento del precio.
@@ -285,3 +286,4 @@ Hasta este punto, el proyecto ya cuenta con:
     -Una API que, a partir de un perfil de riesgo y unos días de inversión, devuelve recomendaciones de monedas en formato JSON, lista para ser consumida por una futura interfaz o dashboard.
 
 La idea es que los siguientes sprints puedan seguir construyendo sobre esto, ya sea mejorando la lógica de recomendación, conectando directamente las predicciones de los modelos o creando una interfaz visual para el usuario final.
+
