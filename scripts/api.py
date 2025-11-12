@@ -2,37 +2,54 @@ from fastapi import FastAPI, Query
 from pydantic import BaseModel
 from typing import Literal, List
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from fastapi.responses import Response
+from io import BytesIO
+from statsmodels.tsa.arima.model import ARIMA
+
 
 df = pd.read_csv("data/crypto_limpio.csv")
 resumen = pd.read_csv("data/cluster_resumen_monedas.csv")
-
 metricas_arima = pd.read_csv("data/metricas_arima.csv")
 metricas_lstm = pd.read_csv("data/metricas_lstm.csv")
 
-
+# normalizo columnas coin en métricas por si vienen con otro nombre
 if "coin" not in metricas_arima.columns:
-    primera_col_arima = metricas_arima.columns[0]
-    metricas_arima = metricas_arima.rename(columns={primera_col_arima: "coin"})
-
+    metricas_arima = metricas_arima.rename(columns={metricas_arima.columns[0]: "coin"})
 if "coin" not in metricas_lstm.columns:
-    primera_col_lstm = metricas_lstm.columns[0]
-    metricas_lstm = metricas_lstm.rename(columns={primera_col_lstm: "coin"})
+    metricas_lstm = metricas_lstm.rename(columns={metricas_lstm.columns[0]: "coin"})
 
-
+# tabla combinada
 tabla_coins = (
     resumen.merge(metricas_arima, on="coin", how="left", suffixes=("", "_arima"))
            .merge(metricas_lstm, on="coin", how="left", suffixes=("", "_lstm"))
-)
-
-tabla_coins = tabla_coins.fillna(0.0)
-
-#modelos de entrada y de salida
+).fillna(0.0)
 
 
+def _pick_col(dframe: pd.DataFrame, opciones: list[str]) -> str:
+    for c in opciones:
+        if c in dframe.columns:
+            return c
+    raise KeyError(f"No se encontró ninguna de estas columnas: {opciones}")
+
+def _serie_cierre(coin: str) -> pd.Series:
+    fecha_col = _pick_col(df, ["time", "date", "Date", "fecha", "Fecha", "timestamp"])
+    close_col = _pick_col(df, ["close", "Close", "precio_cierre", "Precio cierre", "price_close"])
+    sub = df[df["coin"].str.lower() == coin.lower()].copy()
+    if sub.empty:
+        raise ValueError(f"Sin datos para '{coin}'")
+    sub[fecha_col] = pd.to_datetime(sub[fecha_col], errors="coerce")
+    sub = sub.dropna(subset=[fecha_col]).sort_values(fecha_col)
+    s = sub.set_index(fecha_col)[close_col].astype(float)
+    s.name = coin.upper()
+    return s
+
+# modelos de entrada/salida 
 class PredictRequest(BaseModel):
     perfil_riesgo: Literal["bajo", "medio", "alto"]
-    dias_inversion: int = 7 
-
+    dias_inversion: int = 7
 
 class RecommendationItem(BaseModel):
     coin: str
@@ -41,70 +58,49 @@ class RecommendationItem(BaseModel):
     ret_std: float
     comentario: str
 
-
 class RecommendationResponse(BaseModel):
     perfil_riesgo: str
-    dias_inversion: int   
+    dias_inversion: int
     recomendaciones: List[RecommendationItem]
-
 
 class HealthResponse(BaseModel):
     status: str
     n_registros: int
     n_monedas: int
 
-
-
 history: List[RecommendationResponse] = []
 
-
-#se crea la app
-
-
+#app
 app = FastAPI(
     title="API Recomendador de Criptomonedas",
     description="API del proyecto de Inteligencia de Negocios (BTC, ETH, ADA).",
     version="0.1.0",
 )
 
-# Logica de negocio de recomendaciones
-
-
+# lógica simple de recomendación 
 def generar_recomendaciones(perfil_riesgo: str, dias_inversion: int) -> RecommendationResponse:
-    """
-    Conecta el resumen del sprint 2 con una lógica sencilla de recomendación.
-    Se usan los promedios y la volatilidad que ya se calculó.
-    """
-
     tabla = tabla_coins.copy()
-
     if perfil_riesgo == "bajo":
-        # Se ordena por volatilidad baja y dentro de eso por retorno medio alto
         tabla = tabla.sort_values(["ret_std", "ret_mean"], ascending=[True, False])
         comentario_base = "Perfil conservador: se priorizan monedas más estables."
     elif perfil_riesgo == "alto":
-        # Se ordena por mayor retorno medio aceptando más volatilidad
         tabla = tabla.sort_values("ret_mean", ascending=False)
         comentario_base = "Perfil agresivo: se priorizan monedas con más retorno esperado."
-    else:  # medio
-        # Pequeño puntaje casero retorno / volatilidad
+    else:
         tabla["score"] = tabla["ret_mean"] / tabla["ret_std"].replace(0, 1)
         tabla = tabla.sort_values("score", ascending=False)
         comentario_base = "Perfil intermedio: equilibrio entre retorno y riesgo."
 
-    # se queda con las 2 mejores monedas
     top = tabla.head(2)
-
     recomendaciones: List[RecommendationItem] = []
     for _, row in top.iterrows():
         comentario = (
-            f"{comentario_base} "
-            f"Retorno medio diario ≈ {row['ret_mean']:.4f}, "
+            f"{comentario_base} Retorno medio diario ≈ {row['ret_mean']:.4f}, "
             f"desviación ≈ {row['ret_std']:.4f}."
         )
         recomendaciones.append(
             RecommendationItem(
-                coin=row["coin"],
+                coin=str(row["coin"]),
                 cluster_kmeans=int(row["cluster_kmeans"]),
                 ret_mean=float(row["ret_mean"]),
                 ret_std=float(row["ret_std"]),
@@ -112,59 +108,93 @@ def generar_recomendaciones(perfil_riesgo: str, dias_inversion: int) -> Recommen
             )
         )
 
-  
     resp = RecommendationResponse(
         perfil_riesgo=perfil_riesgo,
         dias_inversion=dias_inversion,
         recomendaciones=recomendaciones,
     )
-
-    
     history.append(resp)
-
     return resp
 
-
-
+# endpoints 
 @app.get("/health", response_model=HealthResponse)
 def health_check():
-    """
-    Endpoint para saber si el servicio está vivo.
-    """
-    n_registros = len(df)
-    n_monedas = df["coin"].nunique()
     return HealthResponse(
         status="ok",
-        n_registros=n_registros,
-        n_monedas=n_monedas,
+        n_registros=len(df),
+        n_monedas=df["coin"].nunique(),
     )
-
 
 @app.post("/predict", response_model=RecommendationResponse)
 def predict(req: PredictRequest):
-    """
-    Recibe el perfil de riesgo del usuario y devuelve recomendaciones.
-    Por ahora se usa el resumen estadístico del sprint 2.
-    """
-    print(f"[PREDICT] perfil={req.perfil_riesgo}, dias_inversion={req.dias_inversion}")
     return generar_recomendaciones(req.perfil_riesgo, req.dias_inversion)
-
 
 @app.get("/recommendations", response_model=RecommendationResponse)
 def get_recommendations(
-    perfil_riesgo: str = Query(..., description="Perfil de riesgo: bajo, medio o alto"),
-    dias_inversion: int = Query(7, description="Cuántos días pienso mantener la inversión"),
+    perfil_riesgo: str = Query(..., description="bajo | medio | alto"),
+    dias_inversion: int = Query(7, description="días que pienso mantener la inversión"),
 ):
-    """
-    Versión GET del recomendador, usando query params.
-    """
     return generar_recomendaciones(perfil_riesgo, dias_inversion)
-
 
 @app.get("/history", response_model=List[RecommendationResponse])
 def get_history():
-    """
-    Devuelve todas las recomendaciones generadas desde que se levantó la API.
-    Solo se guarda en memoria mientras el servidor está encendido.
-    """
     return history
+
+# endpoints de gráficas
+@app.get("/plot/price/all")
+def plot_price_all(dias: int = 60):
+    coins = sorted(df["coin"].str.lower().unique())
+    n = len(coins)
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(8, 3*n), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for ax, c in zip(axes, coins):
+        s = _serie_cierre(c).tail(dias)
+        ax.plot(s.index, s.values, label=c.upper())
+        ax.set_ylabel("Precio")
+        ax.legend(loc="upper left")
+
+    axes[-1].set_xlabel("Fecha")
+    fig.suptitle(f"Precio de cierre – todas (últimos {dias} días)")
+    fig.tight_layout()
+
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return Response(content=buf.read(), media_type="image/png")
+
+@app.get("/plot/forecast/arima/all")
+def plot_arima_all(test_size: int = 20, p: int = 1, d: int = 1, q: int = 1):
+    coins = sorted(df["coin"].str.lower().unique())
+    n = len(coins)
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(8, 3*n), sharex=False)
+    if n == 1:
+        axes = [axes]
+
+    for ax, c in zip(axes, coins):
+        s = _serie_cierre(c).dropna()
+        npts = len(s)
+        corte = max(1, min(npts - 1, int(npts * (1 - test_size/100))))  
+        train = s.iloc[:corte]
+        test  = s.iloc[corte:]
+
+        modelo = ARIMA(train, order=(p, d, q)).fit()
+        pron = modelo.forecast(steps=len(test))
+
+        ax.plot(train.index, train.values, label="Train")
+        ax.plot(test.index,  test.values,  label="Test")
+        ax.plot(test.index,  pron.values,  label="Pronóstico")
+        ax.set_title(f"ARIMA({p},{d},{q}) – {c.upper()}")
+        ax.set_ylabel("Precio")
+        ax.legend(loc="upper left")
+
+    axes[-1].set_xlabel("Fecha")
+    fig.tight_layout()
+
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return Response(content=buf.read(), media_type="image/png")
