@@ -286,3 +286,76 @@ Hasta este punto, el proyecto ya cuenta con:
 
 La idea es que los siguientes sprints puedan seguir construyendo sobre esto, ya sea mejorando la lógica de recomendación, conectando directamente las predicciones de los modelos o creando una interfaz visual para el usuario final.
 
+**Sprint 4 -- Desarrollo del Dashboard interactivo**
+Objetivo del sprint
+
+Se construyó una interfaz visual para mostrar estadísticas y recomendaciones de inversión basadas en el servicio de backend del proyecto. El tablero permite ajustar parámetros (perfil de riesgo y días), consultar el estado del servicio, visualizar recomendaciones y explorar gráficos (estáticos e interactivos) que resumen el comportamiento reciente y el pronóstico de las criptomonedas analizadas (BTC, ETH, ADA).
+
+Entregables
+
+    Dashboard funcional con:
+    Parámetros de entrada: perfil de riesgo (bajo, medio, alto) y horizonte en días.
+    Estado del servicio (registros, monedas, “ok”).
+    Tabla de recomendaciones con cluster, retorno y desviación.
+    Gráfico estático (Matplotlib) de precios recientes que cambia con los días.
+    Gráfico interactivo (Plotly) con series de BTC/ETH/ADA y herramientas de zoom/descarga.
+    Tres gráficos ARIMA (uno por moneda) con línea real (train/test) y pronóstico en el tramo de prueba.
+    Leyendas y textos de ayuda pensados para usuario final.
+
+    El dashboard asume precios en dolares. Los ejes y leyendas lo indican explícitamente.
+    Se habilitó cache busting con un query param _t para forzar refresco de imágenes.
+
+**Ejecutar el proyecto**
+Backend API
+
+poetry install
+poetry run uvicorn scripts.api:app --reload --host 127.0.0.1 --port 8000
+
+Frontend 
+Abrir web/index.html en el navegador o servirlo con un http server sencillo:
+opción 1 (Python 3)
+cd web
+python -m http.server 5500
+
+opción 2 (Node)
+npx serve -p 5500 web
+
+Luego navegar a http://127.0.0.1:5500/index.html.
+
+**Uso del tablero**
+Elegir perfil de riesgo y días de inversión.
+Pulsar Actualizar.
+Revisar:
+“Estado del servicio” (registros, monedas, estado).
+Tabla de Recomendaciones con retorno y desviación por moneda.
+Histórico de precios (imagen estática), que se actualiza cuando cambian los días.
+Gráfico interactivo Plotly para explorar las tres series (zoom, pan, descargar).
+ARIMA por moneda (3 PNG): comparación train/test vs. pronóstico.
+
+**Usabilidad y decisiones de diseño**
+
+Tema oscuro de bajo contraste agresivo para evitar fatiga visual.
+Tarjetas con títulos cortos, figcaptions explicativos y tipografía legible.
+Los gráficos incluyen texto para usuario final, evitando términos técnicos.
+Los elementos “Actualizar” y “Reset” aceleran la iteración de parámetros.
+
+# Validaciones realizadas
+
+La imagen Matplotlib responde al parámetro dias (N dinámico).
+El gráfico Plotly consume /series/price/all y se redibuja con los días seleccionados.
+Los PNG ARIMA por moneda cargan correctamente y se “rompen” cache con _t.
+CORS activo para permitir fetch desde index.html.
+
+# Evidencia sugerida 
+
+Parámetros + Estado del servicio.
+Tabla de recomendaciones.
+Imagen de precios recientes.
+Plotly con herramientas visibles (zoom, cámara).
+Tres ARIMA (BTC/ETH/ADA) ampliados.
+
+# Limitaciones y siguientes pasos
+Los ARIMA se sirven como PNG; una versión interactiva futura (Plotly/Altair) permitiría inspección detallada.
+La conversión de moneda (COP u otras) no está implementada; requiere factor de conversión y ajuste de etiquetas.
+Se sugiere añadir filtros por moneda y un tooltip contextual en la tabla de recomendaciones.
+

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Crypto – Sprint 4</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Dashboard Crypto</h1>
+    <div id="statusDot" class="dot dot-off"></div>
+  </header>
+
+  <main class="wrap">
+    <!-- Parámetros -->
+    <section class="card">
+      <h2>parametros</h2>
+      <form id="frm">
+        <label>
+          perfil de riesgo
+          <select id="perfil">
+            <option value="bajo">bajo</option>
+            <option value="medio" selected>medio</option>
+            <option value="alto">alto</option>
+          </select>
+        </label>
+        <label>
+          dias de inversión
+          <input id="dias" type="number" min="1" max="365" value="7" />
+        </label>
+        <div class="row">
+          <button type="submit" class="btn">Actualizar</button>
+          <button type="button" id="btnReset" class="btn btn-ghost">Reset</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Estado -->
+    <section class="card">
+      <h2>estado del servicio</h2>
+      <div class="grid-3" id="healthBox">
+        <div class="stat">
+          <div class="stat-k">–</div>
+          <div class="stat-l">Registros</div>
+        </div>
+        <div class="stat">
+          <div class="stat-k">–</div>
+          <div class="stat-l">Monedas</div>
+        </div>
+        <div class="stat">
+          <div class="stat-k ok">–</div>
+          <div class="stat-l">Estado</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recomendaciones -->
+    <section class="card">
+      <h2>recomendaciones</h2>
+      <div id="resumenSel" class="tag"></div>
+      <table class="table" id="tbl">
+        <thead>
+          <tr>
+            <th>Moneda</th>
+            <th>Cluster</th>
+            <th>Retorno</th>
+            <th>Desv</th>
+            <th>Comentario</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Gráficos (ancho completo) -->
+    <section class="card card-wide">
+      <h2>Gráficos</h2>
+
+      <!-- Imagen Matplotlib -->
+      <figure class="figure">
+        <img id="imgPrecios" alt="Precios últimos días" loading="lazy" />
+        <figcaption>
+          Histórico reciente de precios de los ultimos N de dias. Sirve para ver si la moneda viene subiendo, bajando o estable.
+        </figcaption>
+      </figure>
+
+      <!-- Gráfico interactivo Plotly -->
+      <figure class="figure">
+        <div id="pltLine" class="plotly-box" aria-label="Gráfico interactivo de precios"></div>
+        <figcaption>
+          Gráfico interactivo de precios por moneda. Permite acercar, mover y descargar la figura.
+        </figcaption>
+      </figure>
+
+      <!-- Imágenes ARIMA por moneda -->
+      <div class="grid-3 charts-minis">
+        <figure class="figure-mini">
+          <img id="imgArimaBtc" alt="ARIMA • BTC" loading="lazy" />
+          <figcaption>BTC: línea real (train/test) vs. pronóstico ARIMA en el tramo de prueba.</figcaption>
+        </figure>
+        <figure class="figure-mini">
+          <img id="imgArimaEth" alt="ARIMA • ETH" loading="lazy" />
+          <figcaption>ETH: línea real (train/test) vs. pronóstico ARIMA en el tramo de prueba.</figcaption>
+        </figure>
+        <figure class="figure-mini">
+          <img id="imgArimaAda" alt="ARIMA • ADA" loading="lazy" />
+          <figcaption>ADA: línea real (train/test) vs. pronóstico ARIMA en el tramo de prueba.</figcaption>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
