@@ -10,7 +10,7 @@ En el primer sprint el objetivo fue conseguir datos reales de criptomonedas, lim
 ¿Qué se hizo?
     -Se escogió el proyecto de criptomonedas y predicción del comportamiento en el mercado.
     -Se trabajó con monedas como Bitcoin (BTC), Ethereum (ETH) y Cardano (ADA).
-    -Se usaron dos APIs como fuentes de información:
+    -Se usaron dos APIs como fuentes de información: CryptoCompare y Binance
         -Una para obtener precios históricos (apertura, cierre, máximo, mínimo).
         -Otra como fuente de respaldo para tener más flexibilidad.
 
