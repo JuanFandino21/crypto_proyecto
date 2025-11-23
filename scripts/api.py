@@ -10,6 +10,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from io import BytesIO
 from statsmodels.tsa.arima.model import ARIMA
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import tensorflow as tf
+from tensorflow.keras import layers, models
 
 df = pd.read_csv("data/crypto_limpio.csv")
 resumen = pd.read_csv("data/cluster_resumen_monedas.csv")
@@ -43,7 +47,7 @@ if "coin" not in metricas_lstm.columns:
 
 tabla_coins = (
     resumen.merge(metricas_arima, on="coin", how="left", suffixes=("", "_arima"))
-           .merge(metricas_lstm, on="coin", how="left", suffixes=("", "_lstm"))
+    .merge(metricas_lstm, on="coin", how="left", suffixes=("", "_lstm"))
 ).fillna(0.0)
 
 class PredictRequest(BaseModel):
@@ -244,3 +248,110 @@ def series_forecast_arima_all(test_size: int = 20, p: int = 1, d: int = 1, q: in
         pron = res.forecast(steps=len(test)).astype(float).tolist()
         out[c.upper()] = {"train": train, "test": test, "forecast": pron}
     return JSONResponse(out)
+
+def _pred_arima_serie(s: pd.Series, horizon: int = 7, hist_dias: int = 30, order=(1, 1, 1)):
+    s = s.astype(float).reset_index(drop=True)
+    modelo = ARIMA(s, order=order)
+    res = modelo.fit()
+    start = max(0, len(s) - hist_dias)
+    end = len(s) - 1
+    pred_hist = res.predict(start=start, end=end)
+    real_hist = s.iloc[start : end + 1]
+    mae = float(mean_absolute_error(real_hist, pred_hist))
+    rmse = float(mean_squared_error(real_hist, pred_hist) ** 0.5)
+    forecast = res.forecast(steps=horizon)
+    y_hat = float(forecast.iloc[-1])
+    idx_hist = list(range(start, end + 1))
+    return idx_hist, real_hist.values, pred_hist.values, y_hat, mae, rmse
+
+def _pred_rnn_serie(s: pd.Series, horizon: int = 7, ventana: int = 10, tipo: str = "lstm", epochs: int = 80, batch_size: int = 16):
+    s = s.astype(float).reset_index(drop=True)
+    valores = s.values.reshape(-1, 1)
+    escala = MinMaxScaler()
+    val_norm = escala.fit_transform(valores)
+    if len(val_norm) <= ventana + 5:
+        raise ValueError("Serie demasiado corta para RNN")
+    X = []
+    y = []
+    for i in range(len(val_norm) - ventana):
+        X.append(val_norm[i : i + ventana])
+        y.append(val_norm[i + ventana])
+    X = np.array(X)
+    y = np.array(y)
+    corte = int(len(X) * 0.8)
+    X_train, X_test = X[:corte], X[corte:]
+    y_train, y_test = y[:corte], y[corte:]
+    modelo = models.Sequential()
+    modelo.add(layers.Input(shape=(ventana, 1)))
+    if tipo == "lstm":
+        modelo.add(layers.LSTM(32))
+    else:
+        modelo.add(layers.GRU(32))
+    modelo.add(layers.Dense(1))
+    modelo.compile(optimizer="adam", loss="mse")
+    modelo.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0)
+    y_pred_norm = modelo.predict(X_test, verbose=0)
+    y_test_real = escala.inverse_transform(y_test)
+    y_pred_des = escala.inverse_transform(y_pred_norm)
+    mae = float(mean_absolute_error(y_test_real, y_pred_des))
+    rmse = float(mean_squared_error(y_test_real, y_pred_des) ** 0.5)
+    start_idx = ventana + corte
+    idx_hist = list(range(start_idx, start_idx + len(X_test)))
+    ultimos = val_norm[-ventana:].copy()
+    actual = ultimos.copy()
+    y_hat_norm = None
+    for _ in range(horizon):
+        x_in = actual.reshape(1, ventana, 1)
+        y_hat_norm = float(modelo.predict(x_in, verbose=0)[0, 0])
+        actual = np.vstack([actual[1:], [[y_hat_norm]]])
+    y_hat = float(escala.inverse_transform([[y_hat_norm]])[0, 0])
+    return idx_hist, y_test_real.flatten(), y_pred_des.flatten(), y_hat, mae, rmse
+
+def _recomendacion(precio_actual: float, precio_futuro: float, umbral: float = 2.0):
+    delta_pct = (precio_futuro - precio_actual) / precio_actual * 100
+    if delta_pct > umbral:
+        txt = "comprar"
+    elif delta_pct < -umbral:
+        txt = "no comprar"
+    else:
+        txt = "mantener / esperar"
+    return float(delta_pct), txt
+
+@app.get("/series/predict")
+def series_predict(
+    coins: str = Query("btc,eth,ada"),
+    model: str = Query("lstm", regex="^(arima|lstm|gru)$"),
+    horizon: int = Query(7, ge=1, le=30),
+):
+    coins_list = [c.strip().lower() for c in coins.split(",") if c.strip()]
+    resultados = []
+    for c in coins_list:
+        s = _serie_cierre(c)
+        if s.empty:
+            continue
+        fechas_full = _serie_close_por_moneda(c)
+        if model == "arima":
+            idx_hist, y_real_hist, y_pred_hist, y_hat, mae, rmse = _pred_arima_serie(s, horizon=horizon)
+        else:
+            idx_hist, y_real_hist, y_pred_hist, y_hat, mae, rmse = _pred_rnn_serie(s, horizon=horizon, tipo=model)
+        fechas_hist = []
+        for idx in idx_hist:
+            if idx < len(fechas_full.index):
+                fechas_hist.append(str(fechas_full.index[idx].date()))
+        precio_actual = float(s.iloc[-1])
+        delta_pct, reco = _recomendacion(precio_actual, y_hat)
+        resultados.append(
+            {
+                "coin": c.upper(),
+                "fechas_hist": fechas_hist,
+                "y_real": [float(v) for v in y_real_hist],
+                "y_pred": [float(v) for v in y_pred_hist],
+                "precio_actual": precio_actual,
+                "precio_pred_horizonte": float(y_hat),
+                "variacion_pct": delta_pct,
+                "recomendacion": reco,
+                "mae": float(mae),
+                "rmse": float(rmse),
+            }
+        )
+    return JSONResponse({"model": model, "horizon": horizon, "resultados": resultados})

@@ -14,9 +14,8 @@
   </header>
 
   <main class="wrap">
-    <!-- Parámetros -->
     <section class="card">
-      <h2>parametros</h2>
+      <h2>parámetros</h2>
       <form id="frm">
         <label>
           perfil de riesgo
@@ -37,7 +36,6 @@
       </form>
     </section>
 
-    <!-- Estado -->
     <section class="card">
       <h2>estado del servicio</h2>
       <div class="grid-3" id="healthBox">
@@ -56,7 +54,6 @@
       </div>
     </section>
 
-    <!-- Recomendaciones -->
     <section class="card">
       <h2>recomendaciones</h2>
       <div id="resumenSel" class="tag"></div>
@@ -74,27 +71,20 @@
       </table>
     </section>
 
-    <!-- Gráficos (ancho completo) -->
     <section class="card card-wide">
       <h2>Gráficos</h2>
-
-      <!-- Imagen Matplotlib -->
       <figure class="figure">
         <img id="imgPrecios" alt="Precios últimos días" loading="lazy" />
         <figcaption>
           Histórico reciente de precios de los ultimos N de dias. Sirve para ver si la moneda viene subiendo, bajando o estable.
         </figcaption>
       </figure>
-
-      <!-- Gráfico interactivo Plotly -->
       <figure class="figure">
         <div id="pltLine" class="plotly-box" aria-label="Gráfico interactivo de precios"></div>
         <figcaption>
           Gráfico interactivo de precios por moneda. Permite acercar, mover y descargar la figura.
         </figcaption>
       </figure>
-
-      <!-- Imágenes ARIMA por moneda -->
       <div class="grid-3 charts-minis">
         <figure class="figure-mini">
           <img id="imgArimaBtc" alt="ARIMA • BTC" loading="lazy" />
@@ -109,6 +99,46 @@
           <figcaption>ADA: línea real (train/test) vs. pronóstico ARIMA en el tramo de prueba.</figcaption>
         </figure>
       </div>
+    </section>
+
+    <section class="card card-wide">
+      <h2>Predicciones y señales de compra</h2>
+      <form id="frmPred" class="pred-form">
+        <label>
+          Monedas
+          <select id="coinsPred" multiple size="3">
+            <option value="btc" selected>BTC</option>
+            <option value="eth">ETH</option>
+            <option value="ada">ADA</option>
+          </select>
+        </label>
+        <label>
+          Modelo
+          <select id="modeloPred">
+            <option value="lstm" selected>LSTM</option>
+            <option value="gru">GRU</option>
+            <option value="arima">ARIMA</option>
+          </select>
+        </label>
+        <label>
+          Horizonte (días)
+          <input id="horizonPred" type="number" min="1" max="30" value="7" />
+        </label>
+        <label>
+          Desde
+          <input id="desdePred" type="date" />
+        </label>
+        <label>
+          Hasta
+          <input id="hastaPred" type="date" />
+        </label>
+        <div class="row">
+          <button type="submit" class="btn">Ver predicciones</button>
+        </div>
+      </form>
+      <div id="predResumen" class="tag"></div>
+      <div id="predPlot" class="plotly-box"></div>
+      <div id="predTablaBox" class="pred-table"></div>
     </section>
   </main>
 

@@ -79,7 +79,6 @@ input,select{
 .table thead th{background:#0b1120;color:#a7b0c4;font-weight:600}
 .table tbody tr:hover{background:#0f172a}
 
-/* Gráficos */
 .figure{margin:0 0 14px 0}
 .figure img{
   width:100%;height:auto;border-radius:10px;border:1px solid var(--line);display:block;
@@ -87,7 +86,6 @@ input,select{
 }
 .figure figcaption{font-size:12px;color:var(--muted);margin-top:6px}
 
-/* Plotly GRANDE */
 .plotly-box{
   width:100%;
   min-height:540px;
@@ -97,7 +95,6 @@ input,select{
   overflow:hidden;
 }
 
-/* Mini-gráficos (ARIMA) más visibles */
 .charts-minis{margin-top:8px}
 .figure-mini{margin:0}
 .figure-mini img{
@@ -115,4 +112,19 @@ input,select{
 .foot{
   text-align:center;color:var(--muted);font-size:12px;
   padding:24px;border-top:1px solid var(--line);margin-top:24px
+}
+
+.pred-form{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:10px;
+  margin-bottom:12px;
+}
+
+select[multiple]{
+  min-height:120px;
+}
+
+.pred-table{
+  margin-top:10px;
 }
