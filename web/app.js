@@ -1,18 +1,10 @@
 const API = "http://127.0.0.1:8000";
 
 const el = (q) => document.querySelector(q);
-const tbody = el("#tbl tbody");
+
 const statusDot = el("#statusDot");
 const healthBox = el("#healthBox");
-const resumenSel = el("#resumenSel");
-const frm = el("#frm");
-const perfil = el("#perfil");
-const dias = el("#dias");
-const imgPrecios = el("#imgPrecios");
-const imgArimaBtc = el("#imgArimaBtc");
-const imgArimaEth = el("#imgArimaEth");
-const imgArimaAda = el("#imgArimaAda");
-const pltLine = el("#pltLine");
+
 const frmPred = el("#frmPred");
 const coinsPred = el("#coinsPred");
 const modeloPred = el("#modeloPred");
@@ -22,6 +14,7 @@ const hastaPred = el("#hastaPred");
 const predResumen = el("#predResumen");
 const predPlot = el("#predPlot");
 const predTablaBox = el("#predTablaBox");
+const imgHeatmap = el("#imgHeatmap");
 
 async function getJson(url) {
   const r = await fetch(url);
@@ -46,60 +39,7 @@ function pintaHealth(data) {
   st.classList.toggle("ok", data.status === "ok");
 }
 
-function pintaRecs(data) {
-  resumenSel.textContent = `perfil: ${data.perfil_riesgo} • días: ${data.dias_inversion}`;
-  tbody.innerHTML = "";
-  data.recomendaciones.forEach((r) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.coin.toUpperCase()}</td>
-      <td>${r.cluster_kmeans}</td>
-      <td>${num(r.ret_mean)}</td>
-      <td>${num(r.ret_std)}</td>
-      <td>${r.comentario}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function pintaImgs() {
-  const bust = `&_t=${Date.now()}`;
-  const d = Number(dias.value) || 60;
-  imgPrecios.src = `${API}/plot/price/all?dias=${d}${bust}`;
-  imgArimaBtc.src = `${API}/plot/forecast/arima/btc?test_size=20&p=1&d=1&q=1${bust}`;
-  imgArimaEth.src = `${API}/plot/forecast/arima/eth?test_size=20&p=1&d=1&q=1${bust}`;
-  imgArimaAda.src = `${API}/plot/forecast/arima/ada?test_size=20&p=1&d=1&q=1${bust}`;
-}
-
-async function pintaPlotly() {
-  const d = Number(dias.value) || 60;
-  const url = `${API}/series/price/all?dias=${d}&_t=${Date.now()}`;
-  const data = await getJson(url);
-
-  const toTrace = (name, s) => {
-    if (Array.isArray(s)) {
-      const xs = s.map((p) => p[0]);
-      const ys = s.map((p) => p[1]);
-      return { x: xs, y: ys, type: "scatter", mode: "lines", name };
-    }
-    return { x: s.x, y: s.y, type: "scatter", mode: "lines", name };
-  };
-
-  const traces = [];
-  if (data.btc) traces.push(toTrace("BTC", data.btc));
-  if (data.eth) traces.push(toTrace("ETH", data.eth));
-  if (data.ada) traces.push(toTrace("ADA", data.ada));
-
-  Plotly.newPlot(
-    pltLine,
-    traces,
-    { margin: { t: 20, r: 20, b: 50, l: 60 }, xaxis: { title: "Fecha" }, yaxis: { title: "Precio" } },
-    { responsive: true, displaylogo: false }
-  );
-
-  setTimeout(() => Plotly.Plots.resize(pltLine), 50);
-  window.addEventListener("resize", () => Plotly.Plots.resize(pltLine));
-}
+// Utilidad para filtrar por rango de fechas
 
 function filtraPorFecha(fechas, valores, desde, hasta) {
   const x = [];
@@ -114,6 +54,8 @@ function filtraPorFecha(fechas, valores, desde, hasta) {
   return { x, y };
 }
 
+// Pintar predicciones histórico + futuro
+
 function pintaPredicciones(data) {
   const { model, horizon, resultados } = data;
   const desde = desdePred.value || null;
@@ -122,24 +64,40 @@ function pintaPredicciones(data) {
   const filas = [];
 
   resultados.forEach((r) => {
-    const realFiltrado = filtraPorFecha(r.fechas_hist, r.y_real, desde, hasta);
-    const predFiltrado = filtraPorFecha(r.fechas_hist, r.y_pred, desde, hasta);
+    // tramo histórico (para métricas)
+    const realHist = filtraPorFecha(r.fechas_hist, r.y_real, desde, hasta);
+    const predHist = filtraPorFecha(r.fechas_hist, r.y_pred, desde, hasta);
 
+    // tramo FUTURO
+    const predFut = filtraPorFecha(r.fechas_fut, r.y_pred_fut, desde, hasta);
+
+    // real histórico
     traces.push({
-      x: realFiltrado.x,
-      y: realFiltrado.y,
+      x: realHist.x,
+      y: realHist.y,
       type: "scatter",
       mode: "lines",
       name: `${r.coin} real`,
     });
 
+    // predicción sobre histórico
     traces.push({
-      x: predFiltrado.x,
-      y: predFiltrado.y,
+      x: predHist.x,
+      y: predHist.y,
       type: "scatter",
       mode: "lines",
       name: `${r.coin} pred ${model.toUpperCase()}`,
       line: { dash: "dot" },
+    });
+
+    // predicción FUTURA
+    traces.push({
+      x: predFut.x,
+      y: predFut.y,
+      type: "scatter",
+      mode: "lines",
+      name: `${r.coin} futuro ${model.toUpperCase()}`,
+      line: { dash: "dashdot" },
     });
 
     filas.push(`
@@ -160,7 +118,7 @@ function pintaPredicciones(data) {
       predPlot,
       traces,
       {
-        title: `Predicciones – modelo ${model.toUpperCase()} (horizonte ${horizon} días)`,
+        title: `Predicciones – modelo ${model.toUpperCase()} (días a predecir: ${horizon})`,
         xaxis: { title: "Fecha" },
         yaxis: { title: "Precio de cierre" },
         margin: { t: 40, r: 20, b: 50, l: 60 },
@@ -191,18 +149,31 @@ function pintaPredicciones(data) {
   }
 
   if (predResumen) {
-    predResumen.textContent = `modelo: ${model.toUpperCase()} • horizonte: ${horizon} días`;
+    let resumen = `modelo: ${model.toUpperCase()} • días a predecir: ${horizon}`;
+    if (desde || hasta) {
+      resumen += ` • rango: ${desde || "inicio"} a ${hasta || "fin"}`;
+    }
+    predResumen.textContent = resumen;
   }
 }
+
+
+// Llamada a la API de predicciones
 
 async function cargarPredicciones() {
   if (!frmPred) return;
   try {
-    const coins = [...coinsPred.selectedOptions].map((o) => o.value).join(",");
-    if (!coins) return;
+    const seleccionadas = [...coinsPred.selectedOptions].map((o) => o.value);
+    if (seleccionadas.length === 0) return;
+
+    const coins = seleccionadas.join(",");
     const model = modeloPred.value;
     const horizon = parseInt(horizonPred.value || "7", 10);
-    const url = `${API}/series/predict?coins=${encodeURIComponent(coins)}&model=${model}&horizon=${horizon}&_t=${Date.now()}`;
+
+    const url = `${API}/series/predict?coins=${encodeURIComponent(
+      coins
+    )}&model=${model}&horizon=${horizon}&_t=${Date.now()}`;
+
     const data = await getJson(url);
     pintaPredicciones(data);
   } catch (e) {
@@ -210,43 +181,58 @@ async function cargarPredicciones() {
   }
 }
 
+
+// Heatmap de correlaciones
+
+async function cargarHeatmap() {
+  if (!imgHeatmap) return;
+  try {
+    const bust = `_t=${Date.now()}`;
+    imgHeatmap.src = `${API}/plot/heatmap?${bust}`;
+  } catch (e) {
+    console.error("Error cargando heatmap:", e);
+  }
+}
+
+// Cargar lista de monedas desde la API
+
+async function cargarCoinsPred() {
+  if (!coinsPred) return;
+  try {
+    const data = await getJson(`${API}/coins?_t=${Date.now()}`);
+    const coins = data.coins || [];
+
+    coinsPred.innerHTML = "";
+    coins.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.toLowerCase();
+      opt.textContent = c.toUpperCase();
+      opt.selected = true; // todas seleccionadas por defecto
+      coinsPred.appendChild(opt);
+    });
+  } catch (e) {
+    console.error("Error cargando monedas:", e);
+  }
+}
+
+
+// Carga inicial (health + predicciones + heatmap)
+
 async function cargar() {
   try {
-    const h = await getJson(`${API}/health`);
+    const h = await getJson(`${API}/health?_t=${Date.now()}`);
     setDot(true);
     pintaHealth(h);
   } catch {
     setDot(false);
   }
 
-  try {
-    const url = `${API}/recommendations?perfil_riesgo=${perfil.value}&dias_inversion=${dias.value}`;
-    const recs = await getJson(url);
-    pintaRecs(recs);
-  } catch (e) {
-    console.error("Recs error:", e);
-  }
-
-  pintaImgs();
-  try {
-    await pintaPlotly();
-  } catch (e) {
-    console.error("Plotly error:", e);
-  }
-
   await cargarPredicciones();
+  await cargarHeatmap();
 }
 
-frm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  cargar();
-});
 
-el("#btnReset").addEventListener("click", () => {
-  perfil.value = "medio";
-  dias.value = 7;
-  cargar();
-});
+// Listeners
 
 if (frmPred) {
   frmPred.addEventListener("submit", (e) => {
@@ -255,4 +241,7 @@ if (frmPred) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", cargar);
+document.addEventListener("DOMContentLoaded", async () => {
+  await cargarCoinsPred();
+  await cargar();
+});

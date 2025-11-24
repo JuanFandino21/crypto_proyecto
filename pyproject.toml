@@ -3,7 +3,7 @@ name = "proyecto-crypto"
 version = "0.1.0"
 description = "Analisis de criptomonedas y modelos de prediccion"
 authors = [
-    {name = "Juan David Fandiño",email = "juan.fandino1@estudiantesunibague.edu.co"}
+    { name = "Juan David Fandiño", email = "juan.fandino1@estudiantesunibague.edu.co" }
 ]
 readme = "README.md"
 requires-python = "^3.11"
@@ -20,10 +20,13 @@ dependencies = [
     "notebook (>=7.4.7,<8.0.0)",
     "python-dotenv (>=1.2.1,<2.0.0)",
     "fastapi (>=0.121.1,<0.122.0)",
-    "uvicorn[standard] (>=0.38.0,<0.39.0)"
+    "uvicorn[standard] (>=0.38.0,<0.39.0)",
+    "seaborn (>=0.13.2,<0.14.0)"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
